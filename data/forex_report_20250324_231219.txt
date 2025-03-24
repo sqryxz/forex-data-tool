@@ -1,0 +1,31 @@
+Forex Market Summary Report
+==================================================
+Generated at: 2025-03-24 23:12:19
+Period: Last 7 days
+
+Currency Pair Analysis:
+
+EUR/USD:
+  Mean Price: 1.2266
+  Volatility: 0.09%
+  Daily Returns: 0.00%
+
+GBP/USD:
+  Mean Price: 1.4918
+  Volatility: 0.09%
+  Daily Returns: 0.01%
+
+JPY/USD:
+  Mean Price: 0.0084
+  Volatility: 0.09%
+  Daily Returns: 0.01%
+
+AUD/USD:
+  Mean Price: 0.8013
+  Volatility: 0.13%
+  Daily Returns: 0.01%
+
+EUR/GBP:
+  Mean Price: 0.8293
+  Volatility: 0.08%
+  Daily Returns: -0.00%
