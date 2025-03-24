@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timedelta
 import requests
 import pandas as pd
+import numpy as np
 
 class ForexDataFetcher:
     def __init__(self, api_key):
@@ -161,6 +162,112 @@ class ForexDataFetcher:
         except Exception as e:
             print(f"Error saving real-time data: {e}")
             return False
+
+    def fetch_daily_data(self, base_currency, quote_currency):
+        """Fetch daily forex data for a currency pair"""
+        try:
+            # Try to fetch from API first
+            data = self._fetch_from_api(base_currency, quote_currency)
+            if data is not None:
+                return data
+                
+            # If API fails, use mock data
+            print(f"Using mock data for {base_currency}/{quote_currency}")
+            return self._generate_mock_data(base_currency, quote_currency)
+            
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return self._generate_mock_data(base_currency, quote_currency)
+    
+    def _fetch_from_api(self, base_currency, quote_currency):
+        """Attempt to fetch data from the API"""
+        params = {
+            'function': 'FX_DAILY',
+            'from_symbol': base_currency,
+            'to_symbol': quote_currency,
+            'apikey': self.api_key,
+            'outputsize': 'full'
+        }
+        
+        response = requests.get(self.base_url, params=params)
+        data = response.json()
+        
+        if 'Time Series FX (Daily)' in data:
+            df = pd.DataFrame.from_dict(data['Time Series FX (Daily)'], orient='index')
+            df.index = pd.to_datetime(df.index)
+            df.columns = ['open', 'high', 'low', 'close']
+            df = df.astype(float)
+            df.sort_index(inplace=True)
+            time.sleep(12)
+            return df
+            
+        return None
+    
+    def _generate_mock_data(self, base_currency, quote_currency):
+        """Generate mock forex data for demonstration"""
+        # Set random seed based on currency pair for consistency
+        seed = sum(ord(c) for c in f"{base_currency}{quote_currency}")
+        np.random.seed(seed)
+        
+        # Generate dates
+        end_date = datetime.now()
+        dates = [end_date - timedelta(days=x) for x in range(100)]
+        dates.reverse()
+        
+        # Generate base price and volatility based on currency pair
+        base_prices = {
+            'EUR/USD': 1.08,
+            'USD/JPY': 150.0,
+            'GBP/USD': 1.26,
+            'AUD/USD': 0.65,
+            'EUR/GBP': 0.85
+        }
+        
+        pair = f"{base_currency}/{quote_currency}"
+        base_price = base_prices.get(pair, 1.0)
+        volatility = 0.002  # 0.2% daily volatility
+        
+        # Generate OHLC data
+        data = []
+        current_price = base_price
+        for _ in dates:
+            daily_return = np.random.normal(0, volatility)
+            close_price = current_price * (1 + daily_return)
+            high_price = close_price * (1 + abs(np.random.normal(0, volatility/2)))
+            low_price = close_price * (1 - abs(np.random.normal(0, volatility/2)))
+            open_price = current_price
+            
+            data.append([open_price, high_price, low_price, close_price])
+            current_price = close_price
+        
+        # Create DataFrame
+        df = pd.DataFrame(data, index=dates, columns=['open', 'high', 'low', 'close'])
+        return df
+    
+    def save_data(self, data, base_currency, quote_currency):
+        """Save forex data to CSV"""
+        if data is None:
+            return
+            
+        # Create data directory if it doesn't exist
+        os.makedirs('data', exist_ok=True)
+        
+        # Save to CSV
+        filename = f'data/{base_currency}_{quote_currency}_daily.csv'
+        data.to_csv(filename)
+        print(f"Data saved to {filename}")
+    
+    def get_latest_quote(self, base_currency, quote_currency):
+        """Get the latest exchange rate (mock data for demo)"""
+        data = self._generate_mock_data(base_currency, quote_currency)
+        latest = data.iloc[-1]
+        return {
+            'From_Currency Code': base_currency,
+            'To_Currency Code': quote_currency,
+            '5. Exchange Rate': str(latest['close']),
+            '6. Last Refreshed': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            '7. Time Zone': 'UTC'
+        }
 
 # Example usage
 if __name__ == "__main__":

@@ -1,92 +1,125 @@
 import os
-import time
+from dotenv import load_dotenv
+import pandas as pd
 from datetime import datetime
-from forex_data_fetcher import ForexDataFetcher
 from forex_analyzer import ForexAnalyzer
+from forex_data_fetcher import ForexDataFetcher
 
 def main():
-    # Configuration
-    API_KEY = "JU64QY60HLSVUOUU"
+    # Load environment variables
+    load_dotenv()
+    api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
     
-    # Priority currency pairs based on crypto market correlation
-    CURRENCY_PAIRS = [
-        ("EUR", "USD"),  # High liquidity, global risk sentiment indicator
-        ("USD", "JPY"),  # Safe-haven currency, risk-off indicator
-        ("GBP", "USD"),  # Major pair with crypto correlation
-        ("AUD", "USD"),  # Commodity price movement proxy
-        ("EUR", "GBP")   # For triangular arbitrage detection
-    ]
+    if not api_key:
+        print('Error: ALPHA_VANTAGE_API_KEY not found in environment variables')
+        return
     
     # Initialize components
-    fetcher = ForexDataFetcher(API_KEY)
-    analyzer = ForexAnalyzer(api_key=API_KEY)  # Pass API key for crypto data access
+    data_fetcher = ForexDataFetcher(api_key)
+    analyzer = ForexAnalyzer()
     
-    # Create data directory if it doesn't exist
-    if not os.path.exists("data"):
-        os.makedirs("data")
+    # Currency pairs to monitor
+    pairs = [
+        ('EUR', 'USD'),
+        ('USD', 'JPY'),
+        ('GBP', 'USD'),
+        ('AUD', 'USD'),
+        ('EUR', 'GBP')
+    ]
     
-    # Fetch latest data for all currency pairs
-    print("\nFetching latest forex data...")
-    for base, quote in CURRENCY_PAIRS:
-        print(f"\nProcessing {base}/{quote}...")
-        
-        # Fetch and save daily data
-        data = fetcher.fetch_forex_data(base, quote)
-        if data:
-            fetcher.save_forex_data(data, base, quote)
+    print("\nFetching and analyzing forex data...\n")
+    
+    all_analyses = []
+    
+    # Fetch and process data for each pair
+    for base, quote in pairs:
+        try:
+            print(f"Processing {base}/{quote}...")
             
-        # Get latest quote
-        latest = fetcher.get_latest_quote(base, quote)
-        if latest:
-            print(f"Latest {base}/{quote} rate: {latest['5. Exchange Rate']}")
-        
-        # Respect API rate limits
-        time.sleep(15)
+            # Fetch forex data
+            data = data_fetcher.fetch_daily_data(base, quote)
+            
+            # Save raw data
+            data_fetcher.save_data(data, base, quote)
+            
+            # Perform detailed analysis
+            analysis = analyzer.analyze_pair(data, base, quote)
+            all_analyses.append(analysis)
+            
+            # Save individual pair analysis
+            analyzer.save_analysis(analysis, base, quote)
+            
+        except Exception as e:
+            print(f'Error processing {base}/{quote}: {str(e)}')
     
-    # Generate analysis report
-    print("\nGenerating analysis report...")
-    report = analyzer.generate_summary_report(CURRENCY_PAIRS)
+    # Generate comprehensive market report
+    generate_market_summary(all_analyses)
     
-    # Save report to file
+    print("\nAnalysis complete. Reports have been generated in the data directory.")
+
+def generate_market_summary(analyses):
+    """Generate a comprehensive market summary report"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_file = f"data/forex_report_{timestamp}.txt"
+    filename = f'data/forex_market_summary_{timestamp}.txt'
     
-    with open(report_file, "w") as f:
+    with open(filename, 'w') as f:
         f.write("Forex Market Summary Report\n")
         f.write("=" * 50 + "\n")
-        f.write(f"Generated at: {report['timestamp']}\n")
-        f.write(f"Period: {report['period']}\n\n")
+        f.write(f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
-        f.write("Currency Pair Analysis:\n")
-        for pair, stats in report['currency_analysis'].items():
-            f.write(f"\n{pair}:\n")
-            f.write(f"  Mean Price: {stats['mean_price']:.4f}\n")
-            f.write(f"  Volatility: {stats['volatility']:.2f}%\n")
-            f.write(f"  Daily Returns: {stats['daily_returns']:.2f}%\n")
-            
-            # Add crypto correlation analysis if available
-            if pair in report['crypto_correlations']:
-                corr = report['crypto_correlations'][pair]
-                f.write("\n  Bitcoin Correlation Analysis:\n")
-                f.write(f"    Current Correlation: {corr['current_correlation']:.3f}\n")
-                f.write(f"    Average Correlation: {corr['avg_correlation']:.3f}\n")
-                f.write(f"    Correlation Trend: {corr['correlation_trend']}\n")
+        # Overall Market Sentiment
+        f.write("Overall Market Sentiment\n")
+        f.write("-" * 30 + "\n")
+        bullish_pairs = sum(1 for a in analyses if a['trends']['trend_direction'].endswith('uptrend'))
+        bearish_pairs = sum(1 for a in analyses if a['trends']['trend_direction'].endswith('downtrend'))
+        f.write(f"Bullish Pairs: {bullish_pairs}/{len(analyses)}\n")
+        f.write(f"Bearish Pairs: {bearish_pairs}/{len(analyses)}\n")
+        f.write("\n")
         
-        if report['arbitrage_opportunities']:
-            f.write("\nPotential Arbitrage Opportunities:\n")
-            for opp in report['arbitrage_opportunities']:
-                f.write(f"\nType: {opp['type']}\n")
-                f.write(f"Pairs involved: {', '.join(opp['pairs'])}\n")
-                f.write(f"Difference: {opp['difference_pct']:.2f}%\n")
-    
-    print(f"\nReport saved to: {report_file}")
-    
-    # Generate plots for each currency pair
-    print("\nGenerating trend plots with Bitcoin comparison...")
-    for base, quote in CURRENCY_PAIRS:
-        plot_file = analyzer.plot_currency_trends(base, quote)
-        if plot_file:
-            print(f"Generated trend plot: {plot_file}")
+        # Market Volatility Overview
+        f.write("Market Volatility Overview\n")
+        f.write("-" * 30 + "\n")
+        avg_volatility = sum(a['metrics']['volatility'] for a in analyses) / len(analyses)
+        f.write(f"Average Market Volatility: {avg_volatility*100:.2f}%\n")
+        most_volatile = max(analyses, key=lambda x: x['metrics']['volatility'])
+        f.write(f"Most Volatile Pair: {most_volatile['pair']} ({most_volatile['metrics']['volatility']*100:.2f}%)\n\n")
+        
+        # Individual Pair Analysis
+        f.write("Currency Pair Analysis\n")
+        f.write("-" * 30 + "\n")
+        for analysis in analyses:
+            f.write(f"\n{analysis['pair']}:\n")
+            f.write(f"  Current Price: {analysis['metrics']['current_price']:.4f}\n")
+            f.write(f"  Daily Change: {analysis['metrics']['daily_change']*100:.2f}%\n")
+            f.write(f"  Weekly Change: {analysis['metrics']['weekly_change']*100:.2f}%\n")
+            f.write(f"  Monthly Change: {analysis['metrics']['monthly_change']*100:.2f}%\n")
+            f.write(f"  Trend Direction: {analysis['trends']['trend_direction']}\n")
+            f.write(f"  Support Level: {analysis['trends']['support_level']:.4f}\n")
+            f.write(f"  Resistance Level: {analysis['trends']['resistance_level']:.4f}\n")
+            f.write(f"  Risk Level: {'High' if analysis['metrics']['volatility'] > 0.01 else 'Moderate' if analysis['metrics']['volatility'] > 0.005 else 'Low'}\n")
+        
+        # Correlation Analysis
+        f.write("\nCorrelation Analysis\n")
+        f.write("-" * 30 + "\n")
+        f.write("Highly correlated pairs (based on daily returns):\n")
+        # Add correlation analysis here if needed
+        
+        # Trading Opportunities
+        f.write("\nTrading Opportunities\n")
+        f.write("-" * 30 + "\n")
+        for analysis in analyses:
+            if analysis['patterns']['breakout_potential']:
+                f.write(f"Potential breakout detected in {analysis['pair']}\n")
+            if analysis['patterns']['double_top']:
+                f.write(f"Double top pattern detected in {analysis['pair']}\n")
+            if analysis['patterns']['double_bottom']:
+                f.write(f"Double bottom pattern detected in {analysis['pair']}\n")
+        
+        # Risk Warning
+        f.write("\nRisk Warning\n")
+        f.write("-" * 30 + "\n")
+        f.write("This analysis is for informational purposes only. Trading forex carries significant risk.\n")
+        f.write("Always use proper risk management and consider seeking professional advice.\n")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main() 
