@@ -204,246 +204,40 @@ class ForexAnalyzer:
         return output_file
 
     def analyze_pair(self, data, base_currency, quote_currency):
-        """Analyze forex data for a currency pair"""
+        """Analyze a currency pair using realtime data"""
         analysis = {
-            'pair': f'{base_currency}/{quote_currency}',
-            'timestamp': datetime.now().isoformat(),
+            'pair': f"{base_currency}/{quote_currency}",
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'metrics': self._calculate_metrics(data),
-            'trends': self._analyze_trends(data),
-            'patterns': self._identify_patterns(data),
-            'risk_metrics': self._calculate_risk_metrics(data)
+            'trends': self._analyze_trends(data)
         }
         return analysis
     
     def _calculate_metrics(self, data):
-        """Calculate basic statistical metrics"""
-        returns = data['close'].pct_change()
-        weekly_returns = data['close'].pct_change(5)
-        monthly_returns = data['close'].pct_change(20)
-        
+        """Calculate basic metrics from the data"""
+        if data.empty:
+            return {}
+            
+        current_price = data['close'].iloc[-1]
         metrics = {
-            'current_price': data['close'].iloc[-1],
-            'daily_change': returns.iloc[-1],
-            'weekly_change': weekly_returns.iloc[-1],
-            'monthly_change': monthly_returns.iloc[-1],
-            'volatility': returns.std(),
-            'avg_daily_range': (data['high'] - data['low']).mean(),
-            'max_price': data['high'].max(),
-            'min_price': data['low'].min(),
-            'avg_volume': (data['high'] - data['low']).mean() * 100000  # Approximate volume
+            'current_price': current_price,
+            'daily_change': (current_price - data['close'].iloc[0]) / data['close'].iloc[0] if len(data) > 1 else 0
         }
         return metrics
     
     def _analyze_trends(self, data):
-        """Analyze price trends"""
-        sma_20 = data['close'].rolling(20).mean()
-        sma_50 = data['close'].rolling(50).mean()
-        sma_200 = data['close'].rolling(200).mean()
+        """Analyze current price trends"""
+        if data.empty:
+            return {}
+            
+        current_price = data['close'].iloc[-1]
+        avg_price = data['close'].mean()
         
-        trends = {
-            'sma_20': sma_20.iloc[-1],
-            'sma_50': sma_50.iloc[-1],
-            'sma_200': sma_200.iloc[-1],
-            'trend_direction': self._determine_trend_direction(sma_20, sma_50, sma_200),
-            'trend_strength': self._calculate_trend_strength(data['close'], sma_20),
-            'support_level': self._find_support_level(data),
-            'resistance_level': self._find_resistance_level(data)
+        trend = {
+            'trend_direction': 'bullish' if current_price > avg_price else 'bearish',
+            'strength': abs((current_price - avg_price) / avg_price)
         }
-        return trends
-    
-    def _identify_patterns(self, data):
-        """Identify common price patterns"""
-        patterns = {
-            'double_top': self._check_double_top(data),
-            'double_bottom': self._check_double_bottom(data),
-            'head_and_shoulders': self._check_head_and_shoulders(data),
-            'breakout_potential': self._check_breakout_potential(data)
-        }
-        return patterns
-    
-    def _calculate_risk_metrics(self, data):
-        """Calculate risk-related metrics"""
-        returns = data['close'].pct_change()
-        risk_metrics = {
-            'var_95': np.percentile(returns.dropna(), 5),  # 95% Value at Risk
-            'max_drawdown': self._calculate_max_drawdown(data['close']),
-            'sharpe_ratio': self._calculate_sharpe_ratio(returns),
-            'beta': self._calculate_beta(returns)
-        }
-        return risk_metrics
-    
-    def _determine_trend_direction(self, sma_20, sma_50, sma_200):
-        """Determine overall trend direction using multiple SMAs"""
-        current_price = sma_20.iloc[-1]
-        if current_price > sma_50.iloc[-1] and current_price > sma_200.iloc[-1]:
-            return 'strong_uptrend'
-        elif current_price > sma_50.iloc[-1]:
-            return 'moderate_uptrend'
-        elif current_price < sma_50.iloc[-1] and current_price < sma_200.iloc[-1]:
-            return 'strong_downtrend'
-        elif current_price < sma_50.iloc[-1]:
-            return 'moderate_downtrend'
-        return 'sideways'
-    
-    def _calculate_trend_strength(self, prices, sma_20):
-        """Calculate trend strength using price deviation from SMA"""
-        deviation = abs(prices - sma_20) / sma_20
-        return deviation.mean()
-    
-    def _find_support_level(self, data, window=20):
-        """Find potential support level"""
-        return data['low'].rolling(window).min().iloc[-1]
-    
-    def _find_resistance_level(self, data, window=20):
-        """Find potential resistance level"""
-        return data['high'].rolling(window).max().iloc[-1]
-    
-    def _check_double_top(self, data):
-        """Check for double top pattern"""
-        highs = data['high'].rolling(10).max()
-        if abs(highs.iloc[-1] - highs.iloc[-10]) < 0.001:
-            return True
-        return False
-    
-    def _check_double_bottom(self, data):
-        """Check for double bottom pattern"""
-        lows = data['low'].rolling(10).min()
-        if abs(lows.iloc[-1] - lows.iloc[-10]) < 0.001:
-            return True
-        return False
-    
-    def _check_head_and_shoulders(self, data):
-        """Basic head and shoulders pattern detection"""
-        # Simplified check - can be enhanced
-        return False
-    
-    def _check_breakout_potential(self, data):
-        """Check for potential breakout"""
-        recent_volatility = data['close'].pct_change().std()
-        current_range = (data['high'] - data['low']).iloc[-1]
-        if current_range > 2 * recent_volatility:
-            return True
-        return False
-    
-    def _calculate_max_drawdown(self, prices):
-        """Calculate maximum drawdown"""
-        peak = prices.expanding(min_periods=1).max()
-        drawdown = (prices - peak) / peak
-        return drawdown.min()
-    
-    def _calculate_sharpe_ratio(self, returns, risk_free_rate=0.02):
-        """Calculate Sharpe ratio"""
-        excess_returns = returns - risk_free_rate/252
-        if excess_returns.std() == 0:
-            return 0
-        return np.sqrt(252) * excess_returns.mean() / excess_returns.std()
-    
-    def _calculate_beta(self, returns, market_returns=None):
-        """Calculate beta (simplified)"""
-        if market_returns is None:
-            # Using a simple proxy
-            return returns.std()
-        return returns.cov(market_returns) / market_returns.var()
-    
-    def save_analysis(self, analysis, base_currency, quote_currency):
-        """Save analysis results with detailed insights"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'data/forex_report_{timestamp}.txt'
-        
-        with open(filename, 'w') as f:
-            f.write("Forex Market Analysis Report\n")
-            f.write("=" * 50 + "\n")
-            f.write(f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Currency Pair: {analysis['pair']}\n\n")
-            
-            # Market Overview
-            f.write("Market Overview\n")
-            f.write("-" * 30 + "\n")
-            f.write(f"Current Price: {analysis['metrics']['current_price']:.4f}\n")
-            f.write(f"Daily Change: {analysis['metrics']['daily_change']*100:.2f}%\n")
-            f.write(f"Weekly Change: {analysis['metrics']['weekly_change']*100:.2f}%\n")
-            f.write(f"Monthly Change: {analysis['metrics']['monthly_change']*100:.2f}%\n")
-            f.write(f"Average Daily Trading Range: {analysis['metrics']['avg_daily_range']:.4f}\n")
-            f.write(f"Approximate Daily Volume: {analysis['metrics']['avg_volume']:,.0f} units\n\n")
-            
-            # Technical Analysis
-            f.write("Technical Analysis\n")
-            f.write("-" * 30 + "\n")
-            f.write(f"Trend Direction: {analysis['trends']['trend_direction']}\n")
-            f.write(f"20-day SMA: {analysis['trends']['sma_20']:.4f}\n")
-            f.write(f"50-day SMA: {analysis['trends']['sma_50']:.4f}\n")
-            f.write(f"200-day SMA: {analysis['trends']['sma_200']:.4f}\n")
-            f.write(f"Support Level: {analysis['trends']['support_level']:.4f}\n")
-            f.write(f"Resistance Level: {analysis['trends']['resistance_level']:.4f}\n")
-            
-            # Pattern Analysis
-            f.write("\nPrice Patterns\n")
-            f.write("-" * 30 + "\n")
-            for pattern, present in analysis['patterns'].items():
-                f.write(f"{pattern.replace('_', ' ').title()}: {'Yes' if present else 'No'}\n")
-            
-            # Risk Analysis
-            f.write("\nRisk Metrics\n")
-            f.write("-" * 30 + "\n")
-            f.write(f"Daily Volatility: {analysis['metrics']['volatility']*100:.2f}%\n")
-            f.write(f"Value at Risk (95%): {analysis['risk_metrics']['var_95']*100:.2f}%\n")
-            f.write(f"Maximum Drawdown: {analysis['risk_metrics']['max_drawdown']*100:.2f}%\n")
-            f.write(f"Sharpe Ratio: {analysis['risk_metrics']['sharpe_ratio']:.2f}\n")
-            f.write(f"Beta: {analysis['risk_metrics']['beta']:.2f}\n\n")
-            
-            # Market Commentary
-            f.write("Market Commentary\n")
-            f.write("-" * 30 + "\n")
-            f.write(self._generate_market_commentary(analysis) + "\n\n")
-            
-            # Trading Implications
-            f.write("Trading Implications\n")
-            f.write("-" * 30 + "\n")
-            f.write(self._generate_trading_implications(analysis) + "\n")
-    
-    def _generate_market_commentary(self, analysis):
-        """Generate market commentary based on analysis"""
-        commentary = []
-        
-        # Trend analysis
-        if analysis['trends']['trend_direction'] == 'strong_uptrend':
-            commentary.append("The pair is showing strong bullish momentum with prices above all major moving averages.")
-        elif analysis['trends']['trend_direction'] == 'strong_downtrend':
-            commentary.append("The pair is in a significant downtrend, trading below key moving averages.")
-        
-        # Volatility commentary
-        vol = analysis['metrics']['volatility'] * 100
-        if vol > 1:
-            commentary.append(f"Market volatility is elevated at {vol:.2f}%, suggesting increased risk and potential opportunities.")
-        else:
-            commentary.append(f"Market volatility remains contained at {vol:.2f}%, indicating stable trading conditions.")
-        
-        # Pattern implications
-        if analysis['patterns']['breakout_potential']:
-            commentary.append("Technical indicators suggest a potential breakout scenario developing.")
-        
-        return " ".join(commentary)
-    
-    def _generate_trading_implications(self, analysis):
-        """Generate trading implications based on analysis"""
-        implications = []
-        
-        # Risk assessment
-        risk_level = "high" if analysis['metrics']['volatility'] > 0.01 else "moderate" if analysis['metrics']['volatility'] > 0.005 else "low"
-        implications.append(f"Risk Level: {risk_level.title()}")
-        
-        # Trading suggestion
-        if analysis['trends']['trend_direction'].endswith('uptrend'):
-            implications.append("Consider long positions with stops below the identified support level.")
-        elif analysis['trends']['trend_direction'].endswith('downtrend'):
-            implications.append("Short positions might be favorable with stops above the resistance level.")
-        else:
-            implications.append("Range-trading strategies may be more appropriate in current conditions.")
-        
-        # Risk management
-        implications.append(f"Suggested Stop Loss: {analysis['risk_metrics']['var_95']*100:.2f}% below entry for long positions.")
-        
-        return "\n".join(implications)
+        return trend
 
 # Example usage
 if __name__ == "__main__":
