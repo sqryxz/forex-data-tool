@@ -1,0 +1,65 @@
+Forex Market Realtime Summary Report
+==================================================
+Generated at: 2025-03-26 23:59:52
+
+Current Exchange Rates
+------------------------------
+EUR/USD: 1.0359
+USD/JPY: 151.5100
+GBP/USD: 1.2699
+AUD/USD: 0.6583
+EUR/GBP: 0.8567
+
+Market Overview
+------------------------------
+
+EUR/USD:
+  Current Price: 1.0359
+  Daily Change: 0.00%
+  Trend Direction: bearish
+  Trend Strength: 0.00%
+
+USD/JPY:
+  Current Price: 151.5100
+  Daily Change: 0.00%
+  Trend Direction: bearish
+  Trend Strength: 0.00%
+
+GBP/USD:
+  Current Price: 1.2699
+  Daily Change: 0.00%
+  Trend Direction: bearish
+  Trend Strength: 0.00%
+
+AUD/USD:
+  Current Price: 0.6583
+  Daily Change: 0.00%
+  Trend Direction: bearish
+  Trend Strength: 0.00%
+
+EUR/GBP:
+  Current Price: 0.8567
+  Daily Change: 0.00%
+  Trend Direction: bearish
+  Trend Strength: 0.00%
+
+Market Insights
+------------------------------
+- EUR/USD shows unusually low volatility (0.00% std dev)
+- USD/JPY shows unusually low volatility (0.00% std dev)
+- GBP/USD shows unusually low volatility (0.00% std dev)
+- AUD/USD shows unusually low volatility (0.00% std dev)
+- EUR/GBP shows unusually low volatility (0.00% std dev)
+
+Arbitrage Opportunities
+------------------------------
+- Triangular opportunity detected:
+  Pairs involved: EUR/USD, EUR/GBP, GBP/USD
+  Direct rate: 1.0359
+  Indirect rate: 1.0878
+  Potential profit: 4.77%
+
+Risk Warning
+------------------------------
+This analysis is based on realtime data and is for informational purposes only.
+Trading forex carries significant risk. Always use proper risk management.
